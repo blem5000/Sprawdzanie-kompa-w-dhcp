@@ -6,6 +6,7 @@ $global:poprawnyIP = $null
 $global:poprawnyMAC = $null
 $global:niePoprawnyIP = $null
 $global:niePoprawnyMAC = $null
+$global:DHCPIP = $null
 
 $FormObject = [System.Windows.Forms.Form]
 $LabelObject = [System.Windows.Forms.Label]
@@ -105,7 +106,39 @@ $btnCopyMAC.Location = New-Object System.Drawing.Point(585, 27)
 $btnCopyMAC.Enabled = $false
 
 
-$DHCPListForm.Controls.AddRange(@($lblHostname, $btnHello, $txtHostname, $lblIP, $lblRozwiazanyIP, $lblRozwiazanyMAC, $lblMAC, $lblStareIP, $lblStaryIP, $lblStaryMAC, $lblStaryRozwiazanyMAC,$btnCopyIP, $btnCopyMAC))
+$DHCPListForm.Controls.AddRange(@($lblHostname, $btnHello, $txtHostname, $lblIP, $lblRozwiazanyIP, $lblRozwiazanyMAC, $lblMAC, $lblStareIP, $lblStaryIP, $lblStaryMAC, $lblStaryRozwiazanyMAC, $btnCopyIP, $btnCopyMAC))
+
+
+$DHCPServerListForm = New-Object $FormObject
+$DHCPServerListForm.MinimumSize = '250,150'
+$DHCPServerListForm.Text = 'Rozwiazywanie hostname w DHCP'
+$DHCPServerListForm.BackColor = "#ffffff"
+$DHCPServerListForm.MaximizeBox = $false
+$DHCPServerListForm.AutoSize = $true
+$DHCPServerListForm.AutoSizeMode = 'GrowAndShrink'
+
+$txtServerIP = New-Object $TextBoxObject
+$txtServerIP.Autosize = $true
+$txtServerIP.Font = 'Verdana,12'
+$txtServerIP.Text = '150.150.222.20'
+$txtServerIP.Size = New-Object System.Drawing.Size(150, 20)
+$txtServerIP.Location = New-Object System.Drawing.Point(440, 32)
+
+$lblServerIP = New-Object $LabelObject
+$lblServerIP.Text = 'Aktualny adres serwera DHCP:'
+$lblServerIP.AutoSize = $true
+$lblServerIP.Font = 'Verdana,12,style=Bold'
+$lblServerIP.Location = New-Object System.Drawing.Point(10, 30)
+
+$btnServerIP = New-Object $ButtonObject
+$btnServerIP.Text = 'OK'
+$btnServerIP.AutoSize = $true
+$btnServerIP.Font = 'Verdana,12'
+$btnServerIP.Location = New-Object System.Drawing.Point(250, 75)
+$btnServerIP.Enabled = $true
+
+$DHCPServerListForm.Controls.AddRange(@($txtServerIP, $lblServerIP, $btnServerIP))
+
 
 #Logic Section/Functions
 
@@ -137,7 +170,7 @@ function DHCPList {
     $btnCopyIP.Enabled = $false
     $btnCopyMAC.Enabled = $false
 
-    $wynik = Get-DhcpServerv4Scope -ComputerName "150.150.222.20" | Get-DhcpServerv4Lease -ComputerName "150.150.222.20" | Where-Object HostName -like ($ComputerName + "*") | Select-Object -Property HostName, IPAddress, ClientId
+    $wynik = Get-DhcpServerv4Scope -ComputerName $global:DHCPIP.ToString() | Get-DhcpServerv4Lease -ComputerName $global:DHCPIP.ToString() | Where-Object HostName -like ($ComputerName + "*") | Select-Object -Property HostName, IPAddress, ClientId
     foreach ($adres in $wynik) {
         if (Test-Connection $adres.IPAddress -Count 1 -Quiet) {
             $poprawnyIP.Add($adres.IPAddress)
@@ -198,24 +231,45 @@ function KopiujIP {
 }
 
 function KopiujMAC {
-   Set-Clipboard -Value $lblRozwiazanyMAC.Text.Replace("-","") 
+    Set-Clipboard -Value $lblRozwiazanyMAC.Text.Replace("-", "") 
 }
 
+function SendServerIP {
+    $test = Get-DhcpServerSetting -ComputerName $txtServerIP.Text -ErrorAction SilentlyContinue
+    if ($txtServerIP.Text -eq '') {
+        $txtServerIP.Text = "150.150.222.20"
+        [System.Windows.MessageBox]::Show('Brak wpisanego IP serwera DHCP', 'Toś narobił')
+    }
+    if ( -not($test)) {
+        [System.Windows.MessageBox]::Show('Niepoprawny adres serwera!!!', 'Toś narobił')
+        $txtServerIP.Text = "150.150.222.20"
+    }
+    else {
+        $global:DHCPIP = $txtServerIP.Text
+        $DHCPServerListForm.Close()
+        $DHCPServerListForm.Dispose()
+        $DHCPListForm.ShowDialog()
+    }
+
+}
 
 # Add the functions to the form
 $btnHello.Add_Click({ SayHello })
 $btnCopyIP.Add_Click({ KopiujIP })
 $btnCopyMAC.Add_Click({ KopiujMAC })
 $txtHostname.Add_KeyDown({
-    if ($_.KeyCode -eq [System.Windows.Forms.Keys]::Enter) {
-        #logic
-        SayHello
-    }
-})
+        if ($_.KeyCode -eq [System.Windows.Forms.Keys]::Enter) {
+            #logic
+            SayHello
+        }
+    })
+$btnServerIP.Add_Click({ SendServerIP })
 
 
 #Display the form
-$DHCPListForm.ShowDialog()
+$DHCPServerListForm.ShowDialog()
+#$DHCPListForm.ShowDialog()
 
 # Cleans up the form
+#$DHCPServerListForm.Dispose()
 $DHCPListForm.Dispose()
